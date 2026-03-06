@@ -18,16 +18,16 @@ export default {
   },
   test: {
     '/api/': {
-      target: 'http://localhost:64584',
+      target: 'https://crm-production-92b8.up.railway.app',
       changeOrigin: true,
-      pathRewrite: { '^': '' },
+      secure: false,
     },
   },
   pre: {
     '/api/': {
-      target: 'http://localhost:64584',
+      target: 'https://crm-production-92b8.up.railway.app',
       changeOrigin: true,
-      pathRewrite: { '^': '' },
+      secure: false,
     },
   },
 };
