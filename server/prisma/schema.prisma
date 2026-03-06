@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique @db.VarChar(50)
+  password  String   @db.VarChar(255)
+  role      String   @db.VarChar(20) // admin, auditor, operator, category
+  name      String?  @db.VarChar(100)
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  submittedProducts Product[]
+  reviewRecords     ApprovalStep[]
+  userRoles         UserRole[]
+
+  @@map("users")
+}
+
+model UserRole {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  role      String   @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@map("user_roles")
+}
+
+model Category {
+  id              Int        @id @default(autoincrement())
+  name            String     @db.VarChar(100) // 分类名称（中文）
+  nameEn          String?    @db.VarChar(100) // 分类名称（英文）
+  hasWhitelist    Boolean    @default(false) @map("has_whitelist")
+  needRsaApproval Boolean    @default(false) @map("need_rsa_approval")
+  needLegalReview Boolean    @default(false) @map("need_legal_review")
+  remark          String?    @db.VarChar(200) // 备注
+  creator         String?    @db.VarChar(50) // 创建人
+  editor          String?    @db.VarChar(50) // 编辑人
+  description     String?    @db.Text
+  deleted         Boolean    @default(false) @map("is_deleted")
+  deletedAt       DateTime?  @map("deleted_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  products Product[]
+  approvals Approval[]
+
+  @@map("categories")
+}
+
+model Product {
+  id               Int        @id @default(autoincrement())
+  name             String     @db.VarChar(200) // 产品名称
+  packageName      String?    @db.VarChar(200) // 包名
+  packageSize      String?    @db.VarChar(50) // 包体大小
+  categoryId       Int?       @map("category_id")
+  targetCountries  String?    @db.VarChar(200) // 投放目标国家，多个用逗号分隔
+  shelfStatus      String?    @db.VarChar(20) // GA, GP, BOTH
+  attributionWindow Int?      @map("attribution_window") // 归因窗口期（天）
+  status           String     @default("pending") @db.VarChar(20) // pending, approving, approved, rejected
+  gpLink           String?    @db.VarChar(500) // GP链接
+  gaLink           String?    @db.VarChar(500) // GA链接
+  gpRating         Float?     @map("gp_rating") // GP评分
+  settlementType   String?    @map("settlement_type") @db.VarChar(20) // CPA, CPS, CPE, CPP
+  submittedBy      Int?       @map("submitted_by")
+  submitterName   String?    @map("submitter_name") @db.VarChar(50) // 提交人姓名
+  submitTime       DateTime?  @map("submit_time") // 提交时间
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  category         Category?  @relation(fields: [categoryId], references: [id])
+  submitter        User?      @relation(fields: [submittedBy], references: [id])
+  approvalSteps    ApprovalStep[]
+  approvals        Approval[]
+
+  @@map("products")
+}
+
+model Approval {
+  id               Int        @id @default(autoincrement())
+  productId        Int        @map("product_id")
+  categoryId       Int?       @map("category_id") // 提交时的分类ID
+  status           String     @default("pending") @db.VarChar(20) // pending, in_progress, approved, rejected
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  product          Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category         Category?  @relation(fields: [categoryId], references: [id])
+  steps            ApprovalStep[]
+
+  @@map("approvals")
+}
+
+model ApprovalStep {
+  id               Int       @id @default(autoincrement())
+  approvalId       Int       @map("approval_id")
+  productId        Int       @map("product_id")
+  step             Int       @default(1) // 步骤序号
+  stepType         String    @db.VarChar(50) // 步骤类型: category_review, legal_review, rsa_operation, rsa_business, rsa_legal
+  stepName         String    @db.VarChar(50) // 步骤名称
+  status           String    @default("pending") @db.VarChar(20) // pending, approved, rejected
+  reviewedBy       Int?      @map("reviewed_by")
+  reviewComment    String?   @map("review_comment") @db.Text
+  reviewedAt       DateTime? @map("reviewed_at")
+  approvedCategoryId Int?    @map("approved_category_id") // 审批通过的分类ID
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  approval         Approval  @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reviewer         User?     @relation(fields: [reviewedBy], references: [id])
+
+  @@map("approval_steps")
+}
