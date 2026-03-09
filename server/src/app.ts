@@ -35,35 +35,48 @@ app.post('/api/init', async (req, res) => {
     const bcrypt = require('bcryptjs');
     const now = new Date();
     
-    const admin = await prisma.user.upsert({
-      where: { username: 'admin' },
-      update: {},
-      create: {
-        username: 'admin',
-        password: bcrypt.hashSync('123456', 10),
-        name: '系统管理员',
-        role: 'admin',
-        createdAt: now,
-        updatedAt: now,
-      },
-    });
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(100),
+        role VARCHAR(50) DEFAULT 'user',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `;
     
-    await prisma.category.createMany({
-      data: [
-        { name: '工具', nameEn: 'Tools', hasWhitelist: false, needRsaApproval: false, needLegalReview: false, creator: 'admin', editor: '', description: '', remark: '', createdAt: now, updatedAt: now },
-        { name: '社交类', nameEn: 'Social', hasWhitelist: false, needRsaApproval: false, needLegalReview: false, creator: 'admin', editor: '', description: '', remark: '', createdAt: now, updatedAt: now },
-        { name: '金融', nameEn: 'Finance', hasWhitelist: false, needRsaApproval: true, needLegalReview: true, creator: 'admin', editor: '', description: '', remark: '', createdAt: now, updatedAt: now },
-        { name: '游戏', nameEn: 'Game', hasWhitelist: false, needRsaApproval: false, needLegalReview: false, creator: 'admin', editor: '', description: '', remark: '', createdAt: now, updatedAt: now },
-      ],
-      skipDuplicates: true,
-    });
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        name_en VARCHAR(100),
+        has_whitelist TINYINT(1) DEFAULT 0,
+        need_rsa_approval TINYINT(1) DEFAULT 0,
+        need_legal_review TINYINT(1) DEFAULT 0,
+        creator VARCHAR(50),
+        editor VARCHAR(50),
+        description TEXT,
+        remark VARCHAR(500),
+        deleted TINYINT(1) DEFAULT 0,
+        deleted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `;
     
-    res.json({ code: 200, data: { user: admin }, msg: '初始化成功' });
+    const hashedPassword = bcrypt.hashSync('123456', 10);
+    
+    await prisma.$executeRaw`INSERT IGNORE INTO users (username, password, name, role) VALUES ('admin', ${hashedPassword}, '系统管理员', 'admin')`;
+    
+    await prisma.$executeRaw`INSERT IGNORE INTO categories (name, name_en, has_whitelist, need_rsa_approval, need_legal_review, creator) VALUES ('工具', 'Tools', 0, 0, 0, 'admin'), ('社交类', 'Social', 0, 0, 0, 'admin'), ('金融', 'Finance', 0, 1, 1, 'admin'), ('游戏', 'Game', 0, 0, 0, 'admin')`;
+    
+    res.json({ code: 200, data: { success: true }, msg: '初始化成功' });
   } catch (error) {
     console.error('Init error:', error);
-    res.json({ code: 500, data: null, msg: '初始化失败' });
+    res.json({ code: 500, data: null, msg: '初始化失败: ' + String(error) });
   }
 });
-
 
 export default app;
